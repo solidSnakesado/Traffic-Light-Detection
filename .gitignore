@@ -218,3 +218,33 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# 영상 (용량이 커서 제외, GitHub 파일당 100MB 제한)
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# 모델 가중치 (yolo26n.pt는 첫 실행 시 자동 다운로드)
+*.pt
+*.pth
+*.onnx
+*.engine
+
+# 학습 결과, 데이터셋, 추출 프레임 (파인튜닝 단계에서 생성)
+runs/
+datasets/
+frames/
+*.zip
+*.tar
+*.tar.gz
+
+# 가상환경 (기본 템플릿의 venv/ 외 이름)
+traffic_venv/
+
+# 에디터, OS 부산물
+.vscode/
+.idea/
+*:Zone.Identifier
+Thumbs.db
+.DS_Store
