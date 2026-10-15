@@ -1,11 +1,13 @@
 """
 tools/convert_labels.py - AI Hub 신호등 라벨(JSON) -> YOLO 학습 데이터셋 변환
 - 입력: AI Hub Validation 폴더 (01.원천데이터 = 이미지, 02.라벨링데이터 = JSON)
-- 출력: dataset/images/{train,val}/*.jpg, dataset/labels/{train,val}/*.txt, dataset/data.yaml
+- 출력: dataset/images/{train,val,test}/*.jpg, dataset/labels/{train,val,test}/*.txt, dataset/data.yaml
 - 라벨 형식 2가지를 모두 읽음
     AI Hub 형식: objects[].class_name / data     [[x1,y1],[x2,y2]] / attribute.signal / image_size
     LabelMe 형식: shapes[].label     / points   [[x1,y1],[x2,y2]] / flags.signal     / imageWidth, imageHeight
-- train/val 은 Clip 폴더(장면) 단위로 나눔 -> 거의 같은 연속 프레임이 양쪽에 섞여 성능이 부풀려지는 것 방지
+- train/val/test 는 Clip 폴더(장면) 단위로 나눔 -> 거의 같은 연속 프레임이 양쪽에 섞여 성능이 부풀려지는 것 방지
+- test 는 학습·모델 선택에 쓰지 않는 최종 평가 전용 (베이스라인과 학습 모델을 같은 기준으로 비교)
+- 다시 실행하면 이전 분할 결과를 지우고 새로 만듦 (분할이 바뀌어도 이전 파일이 남지 않도록)
 - 이미지는 기본으로 심볼릭 링크 (원본을 가리키는 바로가기, 디스크 절약), --copy를 주면 실제 복사
 
 실행: python tools/convert_labels.py --src <Validation 폴더 경로> --out dataset
@@ -16,8 +18,8 @@ import argparse                                                         # 명령
 import glob                                                             # 패턴으로 파일 목록 찾기 (**: 하위 폴더 전체)
 import json                                                             # 라벨 JSON 읽기
 import os                                                               # 심볼릭 링크 만들기, 기존 파일 지우기
-import random                                                           # Clip 폴더를 섞어 train/val 로 나누기
-import shutil                                                           # --copy 일 때 이미지 복사
+import random                                                           # Clip 폴더를 섞어 train/val/test 로 나누기
+import shutil                                                           # --copy 일 때 이미지 복사, 이전 결과 폴더 지우기
 
 from collections import Counter                                         # 클래스별 박스 수 세기
 from pathlib import Path                                                # 경로 다루기 (폴더 이름, 확장자 분리)
@@ -101,7 +103,8 @@ def parse_args():
     p = argparse.ArgumentParser(description="AI Hub 신호등 라벨 -> YOLO 데이터셋 변환")
     p.add_argument("--src", required=True, help="Validation 폴더 (01.원천데이터, 02.라벨링데이터 가 있는 곳)")
     p.add_argument("--out", default="dataset", help="출력 폴더")
-    p.add_argument("--val", type=float, default=0.2, help="val 로 쓸 Clip 폴더 비율 (0~1)")
+    p.add_argument("--val", type=float, default=0.15, help="val 로 쓸 Clip 폴더 비율 (0~1)")
+    p.add_argument("--test", type=float, default=0.15, help="test 로 쓸 Clip 폴더 비율 (0~1)")
     p.add_argument("--seed", type=int, default=0, help="Clip 섞기 난수 시드 (같으면 항상 같은 분할)")
     p.add_argument("--copy", action="store_true", help="링크 대신 이미지 복사")
     return p.parse_args()
@@ -123,13 +126,18 @@ def main():
 
     clips = sorted(set(clip_of.values()))                               # Clip 폴더 목록
     random.Random(args.seed).shuffle(clips)                             # 시드 고정으로 섞기
-    val_clips = set(clips[:round(len(clips) * args.val)])               # 앞쪽 일정 비율을 val 로
+    n_test = round(len(clips) * args.test)                              # test 로 쓸 Clip 수
+    n_val  = round(len(clips) * args.val)                               # val 로 쓸 Clip 수
+    split_of = {c: "test" for c in clips[:n_test]}                      # 맨 앞은 test
+    split_of.update({c: "val" for c in clips[n_test:n_test + n_val]})   # 그 다음은 val (나머지는 train)
 
-    for split in ("train", "val"):                                      # 출력 폴더 만들기
-        (out / "images" / split).mkdir(parents=True, exist_ok=True)
-        (out / "labels" / split).mkdir(parents=True, exist_ok=True)
+    splits = ("train", "val", "test")
+    for split in splits:                                                # 출력 폴더 만들기
+        for kind in ("images", "labels"):
+            shutil.rmtree(out / kind / split, ignore_errors=True)       # 이전 결과 지우기 (링크만 지워지고 원본은 그대로)
+            (out / kind / split).mkdir(parents=True, exist_ok=True)
 
-    count = {"train": Counter(), "val": Counter()}                       # split 별 클래스 박스 수
+    count = {s: Counter() for s in splits}                              # split 별 클래스 박스 수
     n_img = Counter()                                                   # split 별 이미지 수
     missing, dropped = 0, 0                                             # 이미지 없는 라벨 수, 너무 작은 박스 수
 
@@ -138,7 +146,7 @@ def main():
         if stem not in images:      # 짝이 되는 이미지가 없으면
             missing += 1
             continue                # 건너뜀
-        split = "val" if clip_of[f] in val_clips else "train"
+        split = split_of.get(clip_of[f], "train")                        # Clip 이 속한 분할
 
         boxes, w, h = read_label(f)
         lines = []
@@ -157,15 +165,15 @@ def main():
         n_img[split] += 1
 
     # data.yaml: 학습할 때 model.train(data="dataset/data.yaml") 로 넘기는 설정 파일
-    yaml = [f"path: {out}", "train: images/train", "val: images/val", "names:"]
+    yaml = [f"path: {out}", "train: images/train", "val: images/val", "test: images/test", "names:"]
     yaml += [f"  {i}: {n}" for i, n in enumerate(NAMES)]
     (out / "data.yaml").write_text("\n".join(yaml) + "\n")
 
     # 결과 요약 출력
-    print(f"clips train {len(clips) - len(val_clips)} / val {len(val_clips)}")
-    print(f"images train {n_img['train']} val {n_img['val']} (missing image {missing}, dropped box {dropped})")
+    print(f"clips train {len(clips) - n_val - n_test} / val {n_val} / test {n_test}")
+    print(f"images train {n_img['train']} / val {n_img['val']} / test {n_img['test']} (missing image {missing}, dropped box {dropped})")
     for i, n in enumerate(NAMES):
-        print(f"{i} {n:<11} train {count['train'][i]:>6} val {count['val'][i]:>6}")
+        print(f"{i} {n:<11} train {count['train'][i]:>6} val {count['val'][i]:>6} test {count['test'][i]:>6}")
     print(f"data.yaml -> {out / 'data.yaml'}") 
 
 if __name__ == "__main__":
