@@ -56,7 +56,7 @@ def make_box(x1, y1, x2, y2, w, h):
 # =============================================================
 # split 이미지 + 원본 JSON -> [(이미지 경로, [(정답 번호, 원본 signal, 박스), ...]), ...]
 # =============================================================
-def load_items(src, data, split):
+def load_items(src, data, split, n_cls=len(STATES)):
     jsons   = {Path(p).stem: p for p in glob.glob(str(src / "02.라벨링데이터/**/*.json"), recursive=True)}
     items   = []                                                        # 반환할 목록
     missing = 0                                                         # 짝이 되는 JSON 이 없는 이미지 수
@@ -69,7 +69,7 @@ def load_items(src, data, split):
         for kind, sig, x1, y1, x2, y2 in boxes:
             cls = class_id(kind, sig)                                   # 데이터셋과 같은 클래스 매핑
             box = make_box(x1, y1, x2, y2, w, h)
-            if cls < len(STATES) and box is not None:                   # 차량 신호 상태(0~5) 박스만
+            if cls < n_cls and box is not None:                         # 기본: 차량 신호 상태(0~5) 박스만
                 gts.append((cls, sig, box))
         items.append((img, gts))
     return items, missing
