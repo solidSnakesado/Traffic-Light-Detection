@@ -56,7 +56,7 @@ def make_box(x1, y1, x2, y2, w, h):
 # =============================================================
 # split 이미지 + 원본 JSON -> [(이미지 경로, [(정답 번호, 원본 signal, 박스), ...]), ...]
 # =============================================================
-def load_items(src, data, split):
+def load_items(src, data, split, n_cls=len(STATES)):
     jsons   = {Path(p).stem: p for p in glob.glob(str(src / "02.라벨링데이터/**/*.json"), recursive=True)}
     items   = []                                                        # 반환할 목록
     missing = 0                                                         # 짝이 되는 JSON 이 없는 이미지 수
@@ -69,7 +69,7 @@ def load_items(src, data, split):
         for kind, sig, x1, y1, x2, y2 in boxes:
             cls = class_id(kind, sig)                                   # 데이터셋과 같은 클래스 매핑
             box = make_box(x1, y1, x2, y2, w, h)
-            if cls < len(STATES) and box is not None:                   # 차량 신호 상태(0~5) 박스만
+            if cls < n_cls and box is not None:                         # 기본: 차량 신호 상태(0~5) 박스만
                 gts.append((cls, sig, box))
         items.append((img, gts))
     return items, missing
@@ -77,7 +77,7 @@ def load_items(src, data, split):
 # =============================================================
 # 박스별 결과 -> 전체 지표 + 혼동 행렬(클래스별 정확도 포함) 출력
 # =============================================================
-def report(rows, title):
+def report(rows, title, cols=COLS, gts=STATES):                         # cols: 예측 열, gts: 정답 행 (eval_cls.py 가 NONE 추가용으로 바꿔 넘김)
     n = len(rows)
     if n == 0:                                                          # 집계할 박스가 없으면
         print(f"\n[{title}] boxes 0")
@@ -86,12 +86,12 @@ def report(rows, title):
     unk = sum(r["pred"] == UNKNOWN for r in rows)                       # 판별 거부(UNKNOWN) 박스 수
     print(f"\n[{title}] boxes {n} acc {ok / n:.1%} reject {unk / n:.1%} "
           f"acc(excl. reject) {ok / max(n - unk, 1):.1%}")
-    print(f"{'gt/pred':<11}" + "".join(f"{SHORT.get(c, c):>8}" for c in COLS) + f"{'n':>6}{'acc':>7}")
-    for g in STATES:                                                    # 정답 클래스마다 한 줄
+    print(f"{'gt/pred':<11}" + "".join(f"{SHORT.get(c, c):>8}" for c in cols) + f"{'n':>6}{'acc':>7}")
+    for g in gts:                                                       # 정답 클래스마다 한 줄
         cnt = Counter(r["pred"] for r in rows if r["gt"] == g)          # 이 클래스 박스의 예측 상태별 개수
         m   = sum(cnt.values())                                         # 이 클래스 박스 수
         acc = f"{cnt[g] / m:.1%}" if m else "-"                         # 박스가 없으면 정확도 표시 안 함
-        print(f"{g:<11}" + "".join(f"{cnt[c]:>8}" for c in COLS) + f"{m:>6}{acc:>7}") 
+        print(f"{g:<11}" + "".join(f"{cnt[c]:>8}" for c in cols) + f"{m:>6}{acc:>7}") 
 
 # =============================================================
 # 원본 signal 값별 결과 (YELLOW 에 합친 전환 프레임 등 확인용)
