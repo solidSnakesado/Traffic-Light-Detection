@@ -7,6 +7,7 @@ tools/eval_flow.py - C4 전체 흐름 평가 (COCO 검출 -> selector -> 판별�
 - 틀린 이유: det_miss(검출 실패) / wrong_box(다른 박스 선택) / wrong_state(상태 오판)
 - 정답 대상이 없는 이미지: false_alarm(없는 신호를 만듦) 비율, unknown(판별 불가 대상) 비율
 - 검출 설정은 detector.py 기본값 그대로 (yolo26n, imgsz 1280, conf 0.25)
+- 학습한 검출 모델: --det-model <best.pt> --det-classes 0 (vehicle 만 selector 에 넘김)
 
 실행 (저장소 폴더에서):
   python tools/eval_flow.py --src <Validation 폴더> --csv ~/datasets/traffic_light/eval_flow_test.csv
@@ -44,6 +45,7 @@ def parse_args():
     p.add_argument("--data", default="~/datasets/traffic_light", help="convert_labels.py 로 만든 데이터셋 폴더")
     p.add_argument("--split", default="test", choices=["train", "val", "test"], help="평가할 분할")
     p.add_argument("--models", nargs="*", default=[str(m) for m in MODELS], help="비교할 분류 모델 best.pt 들 (0개면 HSV만)")
+    p.add_argument("--det-classes", type=int, nargs="*", default=[9], help="남길 검출 클래스 번호 (기본 COCO 9, 학습 모델은 0 = vehicle, 빈 값 = 전부)")
     p.add_argument("--no-hsv", action="store_true", help="HSV 판별기 빼기")
     p.add_argument("--det-model", default="yolo26n.pt", help="검출 모델 (기본: COCO yolo26n)")
     p.add_argument("--conf", type=float, default=0.25, help="검출 신뢰도 임계값 (detector.py 기본값)")
@@ -86,7 +88,8 @@ def main():
     if args.limit:
         items = items[:args.limit]      # 시험용으로 앞쪽만
     det             = TrafficLightDetector(model_path=args.det_model, conf=args.conf,
-                                           imgsz=args.imgsz, device=args.device)            # 검출기 (기본값 = detector.py 와 같음)
+                                           imgsz=args.imgsz, device=args.device,
+                                           target_classes=args.det_classes or None)         # 검출기 (빈 값이면 모든 클래스)
     sel             = TargetSelector()      # 기준값은 기본값 그대로 (E01~E03과 같음)
     judges          = ([] if args.no_hsv else [HsvJudge()]) + [ModelJudge(m, args.cls_imgsz, args.device) 
                                                                for m in args.models]
