@@ -83,11 +83,11 @@ ros2 run traffic_light_nodes env_check                   # 환경 확인
 | R5 | Pinky Pro 연동 (명령 끊김 감시 포함) | 예정 |
 | R6 | launch, 문서 | 예정 |
 
-## 실험 상세 (작성 예정, `docs/`)
+## 실험 상세 (`docs/`)
 
 | 문서 | 내용 |
 |---|---|
-| 상태 판별 | E01 HSV, E02, E03 (조건, 혼동 행렬, 오류 유형) |
-| 검출 / 전체 흐름 | D01 COCO, D02 파인튜닝, C4 전체 흐름, 오경보 분석 |
-| 안정화 | smoother 방식, 기준값, drive.mp4 구간별 확인 |
-| 실행 장치 | 젯슨 TensorRT 변환, 속도, DESKTOP 결과 비교 |
+| [상태 판별](docs/state_classification.md) | E01 HSV, E02, E03 (조건, 혼동 행렬, 오류 유형) |
+| [검출 / 전체 흐름](docs/detection_and_flow.md) | D01 COCO, D02 파인튜닝, C4 전체 흐름, 오경보 분석, C6 시연 영상 |
+| [안정화](docs/smoothing.md) | smoother 방식, 기준값, drive.mp4 구간별 확인 |
+| [실행 장치](docs/jetson_runtime.md) | 젯슨 TensorRT 변환, 속도, DESKTOP 결과 비교 |
