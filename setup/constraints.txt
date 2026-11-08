@@ -1,0 +1,5 @@
+# 모든 장치 공통 pip 제약 (pip install ... -c setup/constraints.txt)
+# numpy 2.x 가 들어오면 ROS2 Jazzy 의 cv_bridge (시스템 numpy 1.26 기준 빌드) 와 충돌
+numpy<2
+# colcon-core (ROS2 빌드 도구) 가 setuptools<80 을 요구. torch 는 >=77.0.3 요구 -> 79.x 로 둘 다 만족
+setuptools<80
