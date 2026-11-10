@@ -22,6 +22,7 @@ setup(
             "video_source = traffic_light_nodes.video_source:main",
             "perception_node = traffic_light_nodes.perception_node:main",
             "raw_recorder = traffic_light_nodes.raw_recorder:main",
+            "smoother_node = traffic_light_nodes.smoother_node:main",
         ],
     },
 )
